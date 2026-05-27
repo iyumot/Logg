@@ -64,21 +64,16 @@ jobs:
       - name: Push to GitHub Packages
         shell: bash
         run: |
-          # 🔴 修改点 3: 显式指定 username 和 password，提高跨组织兼容性
-          dotnet nuget add source "${{ env.NUGET_SOURCE }}" \
-            --name "github-org" \
-            --username "${{ github.actor }}" \
-            --password "${{ secrets.ORG_PAT }}" \
-            --store-password-in-clear-text
-
-          # 推送主包
+          # ✅ setup-dotnet 已自动配置源和认证，直接推送即可
           dotnet nuget push "./nupkgs/*.nupkg" \
-            --source "github-org" \
+            --source "${{ env.NUGET_SOURCE }}" \
+            --api-key "${{ secrets.ORG_PAT }}" \
             --skip-duplicate
           
           # 推送符号包（如果存在）
           if ls ./nupkgs/*.snupkg 1> /dev/null 2>&1; then
             dotnet nuget push "./nupkgs/*.snupkg" \
-              --source "github-org" \
+              --source "${{ env.NUGET_SOURCE }}" \
+              --api-key "${{ secrets.ORG_PAT }}" \
               --skip-duplicate
           fi
