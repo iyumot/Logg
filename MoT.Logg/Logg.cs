@@ -261,7 +261,7 @@ public static class Logg
         lock (_regLock)
         {
             if (_isDefaultRegistered) return;
-            var sql = $"CREATE TABLE IF NOT EXISTS {_defaultTableName} (Timestamp TEXT, Level INTEGER, Message TEXT, Exception TEXT, Properties TEXT)";
+            var sql = $"CREATE TABLE IF NOT EXISTS {_defaultTableName} (Timestamp TEXT, Level INTEGER, Caller TEXT, Message TEXT, Exception TEXT, Properties TEXT)";
             Register<LogEvent>(WriteLogEvent, _defaultTableName, sql);
             _isDefaultRegistered = true;
         }
@@ -270,11 +270,12 @@ public static class Logg
     private static void WriteLogEvent(LogEvent evt)
     {
         var job = new LogJob(
-            $"INSERT INTO {_defaultTableName} (Timestamp, Level, Message, Exception, Properties) VALUES ($t, $l, $m, $e, $p)",
+            $"INSERT INTO {_defaultTableName} (Timestamp, Level, Caller, Message, Exception, Properties) VALUES ($t, $l, $c, $m, $e, $p)",
             cmd =>
             {
                 cmd.Parameters.AddWithValue("$t", evt.Timestamp.ToString("o"));
                 cmd.Parameters.AddWithValue("$l", (int)evt.Level);
+                cmd.Parameters.AddWithValue("$c", evt.Caller);
                 cmd.Parameters.AddWithValue("$m", evt.Message);
                 cmd.Parameters.AddWithValue("$e", (object?)evt.Exception ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$p", (object?)evt.Properties ?? DBNull.Value);
@@ -295,7 +296,7 @@ public static class Logg
             Message = message ?? "",
             Exception = ex?.ToString(),
             Properties = propertyValues?.Length is null or 0 ? null : JsonSerializer.Serialize(propertyValues),
-            CallerMemberName = callerMemberName
+            Caller = callerMemberName
         };
 
         Write(evt);
@@ -349,5 +350,5 @@ public class LogEvent
     public string Message { get; set; } = "";
     public string? Exception { get; set; }
     public string? Properties { get; set; }
-    public string? CallerMemberName { get; set; }
+    public string? Caller { get; set; }
 }
