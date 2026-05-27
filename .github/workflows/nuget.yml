@@ -77,3 +77,16 @@ jobs:
               --api-key "${{ secrets.ORG_PAT }}" \
               --skip-duplicate
           fi
+
+      - name: Set Package Visibility to Public
+        env:
+          # ⚠️ 替换为你的实际包 ID（如 MyLib、Company.Core 等）
+          PACKAGE_ID: "Your.Package.Id"
+        run: |
+          curl -s -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: token ${{ secrets.ORG_PAT }}" \
+            https://api.github.com/orgs/FundOffice/packages/nuget/${{ env.PACKAGE_ID }} \
+            -d '{"visibility": "public"}' \
+            > /dev/null
+          echo "✅ 已将包 ${{ env.PACKAGE_ID }} 设为 Public"
