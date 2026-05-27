@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.Sqlite;
+using Microsoft.Data.Sqlite;
 using SQLitePCL;
 using System;
 using System.Collections.Generic;
@@ -253,7 +253,7 @@ public static class Logg
     private static readonly string _defaultTableName = "_def_logs_";
     private static bool _isDefaultRegistered = false;
     private static readonly object _regLock = new object();
-    private static readonly Regex _propRegex = new Regex(@"\{(\w+)(?:[:#][^\}]*)?\}", RegexOptions.Compiled);
+
 
     private static void EnsureDefaultRegistered()
     {
@@ -284,50 +284,17 @@ public static class Logg
         Enqueue(job);
     }
 
-    private static string? FormatMessage(string? template, object?[]? values, out string propertiesJson)
-    {
-        if (string.IsNullOrEmpty(template))
-        {
-            propertiesJson = "{}";
-            return string.Empty;
-        }
 
-        var matches = _propRegex.Matches(template);
-        if (matches.Count == 0)
-        {
-            propertiesJson = "{}";
-            return template;
-        }
-
-        var dict = new Dictionary<string, object?>();
-        var result = template;
-        int i = 0;
-        foreach (Match match in matches)
-        {
-            var name = match.Groups[1].Value;
-            var val = (values != null && i < values.Length) ? values[i] : null;
-            dict[name] = val;
-            result = result?.Replace(match.Value, val?.ToString() ?? "null");
-            i++;
-        }
-
-        try { propertiesJson = JsonSerializer.Serialize(dict); }
-        catch { propertiesJson = "{}"; }
-
-        return result;
-    }
-
-    private static void WriteLog(LogLevel level, Exception? ex, string? messageTemplate, string callerMemberName, params object?[]? propertyValues)
+    private static void WriteLog(LogLevel level, Exception? ex, string? message, string callerMemberName, params object?[]? propertyValues)
     {
         EnsureDefaultRegistered();
-        var message = FormatMessage(messageTemplate, propertyValues, out var props);
 
         var evt = new LogEvent
         {
             Level = level,
             Message = message ?? "",
             Exception = ex?.ToString(),
-            Properties = props,
+            Properties = propertyValues?.Length is null or 0 ? null : JsonSerializer.Serialize(propertyValues),
             CallerMemberName = callerMemberName
         };
 
@@ -336,29 +303,29 @@ public static class Logg
 
 
 
-    public static void Verbose(string? messageTemplate, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
-        WriteLog(LogLevel.Verbose, null, messageTemplate, caller, propertyValues);
+    public static void Verbose(string? message = null, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
+        WriteLog(LogLevel.Verbose, null, message , caller, propertyValues);
 
-    public static void Debug(string? messageTemplate, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
-        WriteLog(LogLevel.Debug, null, messageTemplate, caller, propertyValues);
+    public static void Debug(string? message = null, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
+        WriteLog(LogLevel.Debug, null, message , caller, propertyValues);
 
-    public static void Information(string? messageTemplate, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
-        WriteLog(LogLevel.Information, null, messageTemplate, caller, propertyValues);
+    public static void Information(string? message = null, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
+        WriteLog(LogLevel.Information, null, message , caller, propertyValues);
 
-    public static void Warning(string? messageTemplate, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
-        WriteLog(LogLevel.Warning, null, messageTemplate, caller, propertyValues);
+    public static void Warning(string? message = null, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
+        WriteLog(LogLevel.Warning, null, message , caller, propertyValues);
 
-    public static void Error(Exception? exception, string? messageTemplate, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
-        WriteLog(LogLevel.Error, exception, messageTemplate, caller, propertyValues);
+    public static void Error(Exception? exception, string? message = null, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
+        WriteLog(LogLevel.Error, exception, message , caller, propertyValues);
 
-    public static void Error(string? messageTemplate, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
-        WriteLog(LogLevel.Error, null, messageTemplate, caller, propertyValues);
+    public static void Error(string? message = null, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
+        WriteLog(LogLevel.Error, null, message , caller, propertyValues);
 
-    public static void Fatal(Exception? exception, string? messageTemplate, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
-        WriteLog(LogLevel.Fatal, exception, messageTemplate, caller, propertyValues);
+    public static void Fatal(Exception? exception, string? message = null, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
+        WriteLog(LogLevel.Fatal, exception, message , caller, propertyValues);
 
-    public static void Fatal(string? messageTemplate, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
-        WriteLog(LogLevel.Fatal, null, messageTemplate, caller, propertyValues);
+    public static void Fatal(string? message = null, [CallerMemberName] string caller = "", params object?[]? propertyValues) =>
+        WriteLog(LogLevel.Fatal, null, message , caller, propertyValues);
 
 
 }
