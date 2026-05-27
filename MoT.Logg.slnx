@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Generator/Logg.Generator.csproj" />
+  <Project Path="MoT.Logg/MoT.Logg.csproj" />
+  <Project Path="Test/Test.csproj" />
+</Solution>
