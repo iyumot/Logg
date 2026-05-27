@@ -137,6 +137,12 @@ public static class Logg
         return new LoggTable<T>(tableName, _readOnlyConnStr, DbPath);
     }
 
+    public static LoggTable<LogEvent> Read()
+    {
+        return new LoggTable<LogEvent>(_defaultTableName, _readOnlyConnStr, DbPath);
+    }
+
+
     private static void Consume()
     {
         var batch = new List<LogJob>(1000);
