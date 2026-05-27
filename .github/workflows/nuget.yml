@@ -1,0 +1,84 @@
+name: Publish NuGet to GitHub Packages (Org)
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package Version (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+env: 
+  NUGET_SOURCE: "https://nuget.pkg.github.com/FundOffice/index.json"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-publish:
+    name: Build and Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          source-url: ${{ env.NUGET_SOURCE }}
+        env:
+          # 🔴 修改点 2: 使用专用 PAT 变量，兼容跨组织推送
+          NUGET_AUTH_TOKEN: ${{ secrets.ORG_PAT }}
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Determine Version
+        id: get_version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            RAW_TAG="${{ github.event.release.tag_name }}"
+            VERSION="${RAW_TAG#v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Resolved Version: $VERSION"
+
+      - name: Pack NuGet
+        run: |
+          dotnet pack --configuration Release --no-build --output ./nupkgs \
+            /p:PackageVersion=${{ env.VERSION }} \
+            /p:ContinuousIntegrationBuild=true
+
+      - name: Push to GitHub Packages
+        shell: bash
+        run: |
+          # 🔴 修改点 3: 显式指定 username 和 password，提高跨组织兼容性
+          dotnet nuget add source "${{ env.NUGET_SOURCE }}" \
+            --name "github-org" \
+            --username "${{ github.actor }}" \
+            --password "${{ secrets.ORG_PAT }}" \
+            --store-password-in-clear-text
+
+          # 推送主包
+          dotnet nuget push "./nupkgs/*.nupkg" \
+            --source "github-org" \
+            --skip-duplicate
+          
+          # 推送符号包（如果存在）
+          if ls ./nupkgs/*.snupkg 1> /dev/null 2>&1; then
+            dotnet nuget push "./nupkgs/*.snupkg" \
+              --source "github-org" \
+              --skip-duplicate
+          fi
