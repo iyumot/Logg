@@ -11,6 +11,7 @@ on:
         default: '1.0.0'
 
 env: 
+  ORG_NAME: "FundOffice"
   NUGET_SOURCE: "https://nuget.pkg.github.com/FundOffice/index.json"
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
@@ -61,15 +62,15 @@ jobs:
             /p:PackageVersion=${{ env.VERSION }} \
             /p:ContinuousIntegrationBuild=true
 
-      - name: Push to GitHub Packages
+      - name: Push to GitHub Packages & Set Public
         shell: bash
         run: |
-          # ✅ setup-dotnet 已自动配置源和认证，直接推送即可
+          # 1. 推送主包
           dotnet nuget push "./nupkgs/*.nupkg" \
             --source "${{ env.NUGET_SOURCE }}" \
             --api-key "${{ secrets.ORG_PAT }}" \
             --skip-duplicate
-          
+
           # 推送符号包（如果存在）
           if ls ./nupkgs/*.snupkg 1> /dev/null 2>&1; then
             dotnet nuget push "./nupkgs/*.snupkg" \
@@ -78,15 +79,22 @@ jobs:
               --skip-duplicate
           fi
 
-      - name: Set Package Visibility to Public
-        env:
-          # ⚠️ 替换为你的实际包 ID（如 MyLib、Company.Core 等）
-          PACKAGE_ID: "Your.Package.Id"
-        run: |
-          curl -s -X PATCH \
+          # 2. 动态提取 Package ID（修复原命令的语法缺陷）
+          FULL_FILE=$(ls ./nupkgs/*.nupkg 2>/dev/null | head -n 1)
+          PACKAGE_ID=$(basename "$FULL_FILE" .nupkg)
+          # 利用前面已生成的 ${{ env.VERSION }} 剥离版本号，得到纯净包名
+          PACKAGE_ID=${PACKAGE_ID%.${{ env.VERSION }}}
+          echo "📦 提取到的 Package ID: $PACKAGE_ID"
+
+          # 3. 调用 GitHub API 改为 Public
+          # ⚠️ 首次发布后 GitHub 需要 ~10 秒注册包元数据，加个 sleep 更稳定
+          sleep 5
+          
+          curl -s -f -X PATCH \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: token ${{ secrets.ORG_PAT }}" \
-            https://api.github.com/orgs/FundOffice/packages/nuget/${{ env.PACKAGE_ID }} \
-            -d '{"visibility": "public"}' \
-            > /dev/null
-          echo "✅ 已将包 ${{ env.PACKAGE_ID }} 设为 Public"
+            -H "Content-Type: application/json" \
+            "https://api.github.com/orgs/${{ env.ORG_NAME }}/packages/nuget/${PACKAGE_ID}" \
+            -d '{"visibility": "public"}' || echo "⚠️ API 调用失败，请手动在网页设置 Public"
+
+          echo "✅ 已完成推送与可见性设置"
